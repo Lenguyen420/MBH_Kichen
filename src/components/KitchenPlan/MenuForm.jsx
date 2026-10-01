@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 
 function MenuForm({
   mode = 'create',
   menu,
   dishes,
+  planRows = [],
   mealOptions,
   shiftOptions,
   onCancel,
@@ -23,10 +24,34 @@ function MenuForm({
   function handleChange(event) {
     const { name, value } = event.target
 
-    setFormValue((currentValue) => ({
-      ...currentValue,
-      [name]: value,
-    }))
+    setFormValue((currentValue) => {
+      const nextValue = {
+        ...currentValue,
+        [name]: value,
+      }
+
+      if (['date', 'meal', 'shift'].includes(name)) {
+        const plannedDishIds = new Set(
+          planRows
+            .filter(
+              (plan) =>
+                plan.menu?.date === nextValue.date &&
+                plan.menu?.meal === nextValue.meal &&
+                plan.menu?.shift === nextValue.shift,
+            )
+            .map((plan) => plan.dishId),
+        )
+
+        return {
+          ...nextValue,
+          dishIds: nextValue.dishIds.filter((dishId) =>
+            plannedDishIds.has(dishId),
+          ),
+        }
+      }
+
+      return nextValue
+    })
   }
 
   function handleLockedChange(event) {
@@ -64,6 +89,27 @@ function MenuForm({
         `Thực đơn ${formValue.meal.toLowerCase()} ${formValue.date}`,
     })
   }
+
+  const plannedDishes = useMemo(() => {
+    const plannedDishMap = new Map()
+
+    planRows
+      .filter(
+        (plan) =>
+          plan.menu?.date === formValue.date &&
+          plan.menu?.meal === formValue.meal &&
+          plan.menu?.shift === formValue.shift,
+      )
+      .forEach((plan) => {
+        const dish = dishes.find((item) => item.id === plan.dishId) || plan.dish
+
+        if (dish) {
+          plannedDishMap.set(dish.id, dish)
+        }
+      })
+
+    return [...plannedDishMap.values()]
+  }, [dishes, formValue.date, formValue.meal, formValue.shift, planRows])
 
   return (
     <form className="space-y-5" onSubmit={handleSubmit}>
@@ -145,7 +191,7 @@ function MenuForm({
       <div>
         <p className="text-sm font-bold text-slate-700">Món trong thực đơn</p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          {dishes.map((dish) => (
+          {plannedDishes.map((dish) => (
             <label
               className="flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50/50 p-3"
               key={dish.id}
@@ -170,6 +216,11 @@ function MenuForm({
             </label>
           ))}
         </div>
+        {!plannedDishes.length ? (
+          <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm font-bold text-amber-700">
+            Chưa có món nào trong kế hoạch cho ngày, bữa và ca này.
+          </p>
+        ) : null}
         {errorMessage ? (
           <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm font-bold text-red-600">
             {errorMessage}

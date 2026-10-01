@@ -15,12 +15,24 @@ import {
   readStoredKitchenDishes,
   readStoredKitchenMenus,
   readStoredKitchenPlans,
+  saveStoredKitchenDishes,
   saveStoredKitchenPlans,
 } from '../datas/kitchenPlanData'
 
+function createDishId(name, index) {
+  const normalizedName = name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '')
+
+  return `dish-plan-${normalizedName || Date.now()}-${index}`
+}
+
 function KitchenPlanTodayPage() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const [dishList] = useState(readStoredKitchenDishes)
+  const [dishList, setDishList] = useState(readStoredKitchenDishes)
   const [menuList] = useState(readStoredKitchenMenus)
   const [planList, setPlanList] = useState(readStoredKitchenPlans)
   const queryPlanId = searchParams.get('planId')
@@ -95,32 +107,66 @@ function KitchenPlanTodayPage() {
   }
 
   function savePlan(planValue) {
-    const nextPlan = {
-      id: planValue.id || `plan-${Date.now()}`,
-      menuId: planValue.menuId,
-      dishId: planValue.dishId,
-      expectedQuantity: planValue.expectedQuantity,
-      plannedStartAt: planValue.plannedStartAt,
-      deadline: planValue.deadline,
-      assignedTo: planValue.assignedTo,
-      serviceArea: planValue.serviceArea,
-      note: planValue.note,
-      status: planValue.status,
-      confirmed: planValue.status !== 'Chờ xác nhận',
-    }
-    const nextPlans = planValue.id
-      ? planList.map((plan) => (plan.id === planValue.id ? nextPlan : plan))
-      : [nextPlan, ...planList]
-    const selectedMenu = menuList.find((menu) => menu.id === nextPlan.menuId)
+    const planMenuId = `planned-${planValue.date}-${planValue.meal}-${planValue.shift}`
+    const nextDishList = [...dishList]
+    const nextPlanItems = planValue.items.map((item, index) => {
+      const dishName = item.dishName.trim()
+      const ingredients = item.ingredients.trim()
+      const existingDish = nextDishList.find(
+        (dish) => dish.name.trim().toLowerCase() === dishName.toLowerCase(),
+      )
+      const dishId = item.dishId || existingDish?.id || createDishId(dishName, index)
+      const nextDish = {
+        ...(existingDish || {}),
+        id: dishId,
+        name: dishName,
+        group: existingDish?.group || 'Món kế hoạch',
+        unit: existingDish?.unit || 'suất',
+        price: existingDish?.price || 0,
+        standardPortion: ingredients,
+        ingredients,
+        cookDuration: existingDish?.cookDuration || 30,
+        recommendedUseMinutes: existingDish?.recommendedUseMinutes || 120,
+        requiresSample: existingDish?.requiresSample ?? true,
+      }
+      const existingDishIndex = nextDishList.findIndex((dish) => dish.id === dishId)
 
+      if (existingDishIndex >= 0) {
+        nextDishList[existingDishIndex] = nextDish
+      } else {
+        nextDishList.push(nextDish)
+      }
+
+      return {
+        id: item.id || `plan-${Date.now()}-${index}`,
+        menuId: planMenuId,
+        date: planValue.date,
+        meal: planValue.meal,
+        shift: planValue.shift,
+        dishId,
+        dishName,
+        ingredients,
+        expectedQuantity: item.expectedQuantity,
+        plannedStartAt: item.plannedStartAt,
+        deadline: item.deadline,
+        assignedTo: item.assignedTo,
+        serviceArea: item.serviceArea,
+        note: item.note,
+        status: item.status,
+        confirmed: item.status !== 'Chờ xác nhận',
+      }
+    })
+    const nextPlans = nextPlanItems.some((item) => planList.some((plan) => plan.id === item.id))
+      ? planList.map((plan) => nextPlanItems.find((item) => item.id === plan.id) || plan)
+      : [...nextPlanItems, ...planList]
+
+    setDishList(nextDishList)
     setPlanList(nextPlans)
+    saveStoredKitchenDishes(nextDishList)
     saveStoredKitchenPlans(nextPlans)
-
-    if (selectedMenu) {
-      setSelectedDate(selectedMenu.date)
-      setSelectedMeal(selectedMenu.meal)
-      setSelectedShift(selectedMenu.shift)
-    }
+    setSelectedDate(planValue.date)
+    setSelectedMeal(planValue.meal)
+    setSelectedShift(planValue.shift)
 
     closeModal()
   }
@@ -154,16 +200,21 @@ function KitchenPlanTodayPage() {
         (selectedShift === 'Tất cả' || menu.shift === selectedShift),
     )
 
-    if (!previousPlans.length || !targetMenu) {
+    if (!previousPlans.length) {
       return
     }
 
     const copiedPlans = previousPlans.map((plan) => ({
       id: `plan-${Date.now()}-${plan.id}`,
-      menuId: targetMenu.id,
-      dishId: targetMenu.dishIds.includes(plan.dishId)
+      menuId: targetMenu?.id || `planned-${selectedDate}-${selectedMeal}-${selectedShift}`,
+      date: selectedDate,
+      meal: selectedMeal === 'Tất cả' ? plan.menu?.meal : selectedMeal,
+      shift: selectedShift === 'Tất cả' ? plan.menu?.shift : selectedShift,
+      dishId: targetMenu?.dishIds.includes(plan.dishId)
         ? plan.dishId
-        : targetMenu.dishIds[0],
+        : plan.dishId,
+      dishName: plan.dish?.name || plan.dishName,
+      ingredients: plan.dish?.ingredients || plan.ingredients || plan.dish?.standardPortion,
       expectedQuantity: plan.expectedQuantity,
       plannedStartAt: plan.plannedStartAt,
       deadline: plan.deadline,
@@ -183,7 +234,7 @@ function KitchenPlanTodayPage() {
     <section className="space-y-6">
       <KitchenPlanHeader
         title="Kế hoạch hôm nay"
-        description="Theo dõi danh sách món cần làm, số lượng dự kiến và mốc thời gian cần hoàn thành trong từng ca."
+        description="Lập danh sách món bếp cần chuẩn bị trong ngày, định lượng từng món và mốc thời gian cần hoàn thành."
         actionLabel="Thêm kế hoạch"
         actionIcon={Plus}
         onAction={() => openModal('create')}
@@ -224,14 +275,12 @@ function KitchenPlanTodayPage() {
                 ? 'Sửa kế hoạch'
                 : 'Chi tiết kế hoạch'
           }
-          description="Kế hoạch luôn được liên kết với thực đơn và món trong thực đơn đã chọn."
+          description="Chọn ngày, bữa, ca và thêm một hoặc nhiều món vào kế hoạch trước khi lưu."
           onClose={closeModal}
         >
           <PlanForm
             mode={activeModal.mode}
             plan={activeModal.plan}
-            menus={menuList}
-            dishList={dishList}
             onCancel={closeModal}
             onSubmit={savePlan}
           />

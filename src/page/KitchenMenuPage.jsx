@@ -6,6 +6,7 @@ import KitchenPlanHeader from '../components/KitchenPlan/KitchenPlanHeader'
 import MenuForm from '../components/KitchenPlan/MenuForm'
 import MenuTable from '../components/KitchenPlan/MenuTable'
 import {
+  buildPlanRows,
   getMenuDishes,
   kitchenShiftOptions,
   mealOptions,
@@ -19,6 +20,7 @@ import {
 function KitchenMenuPage() {
   const [dishList] = useState(readStoredKitchenDishes)
   const [menuList, setMenuList] = useState(readStoredKitchenMenus)
+  const [planList, setPlanList] = useState(readStoredKitchenPlans)
   const [selectedDate, setSelectedDate] = useState('2026-09-30')
   const [selectedMeal, setSelectedMeal] = useState('Tất cả')
   const [selectedShift, setSelectedShift] = useState('Tất cả')
@@ -66,8 +68,27 @@ function KitchenMenuPage() {
       : [nextMenu, ...menuList]
     const storedPlans = readStoredKitchenPlans()
     const fixedPlans = storedPlans.map((plan) => {
+      const planMatchesMenu =
+        (plan.date === nextMenu.date ||
+          menuList.find((menu) => menu.id === plan.menuId)?.date === nextMenu.date) &&
+        (plan.meal === nextMenu.meal ||
+          menuList.find((menu) => menu.id === plan.menuId)?.meal === nextMenu.meal) &&
+        (plan.shift === nextMenu.shift ||
+          menuList.find((menu) => menu.id === plan.menuId)?.shift === nextMenu.shift)
+      const shouldLinkPlannedDish =
+        planMatchesMenu && nextMenu.dishIds.includes(plan.dishId)
       const shouldRelinkDish =
         plan.menuId === nextMenu.id && !nextMenu.dishIds.includes(plan.dishId)
+
+      if (shouldLinkPlannedDish) {
+        return {
+          ...plan,
+          menuId: nextMenu.id,
+          date: nextMenu.date,
+          meal: nextMenu.meal,
+          shift: nextMenu.shift,
+        }
+      }
 
       return shouldRelinkDish
         ? { ...plan, dishId: nextMenu.dishIds[0] }
@@ -75,6 +96,7 @@ function KitchenMenuPage() {
     })
 
     setMenuList(nextMenus)
+    setPlanList(fixedPlans)
     saveStoredKitchenMenus(nextMenus)
     saveStoredKitchenPlans(fixedPlans)
     setSelectedDate(nextMenu.date)
@@ -114,7 +136,7 @@ function KitchenMenuPage() {
     <section className="space-y-6">
       <KitchenPlanHeader
         title="Thực đơn"
-        description="Xem thực đơn theo ngày, bữa hoặc ca. Các món trong thực đơn được dùng để lập kế hoạch chế biến."
+        description="Tạo thực đơn từ các món đã có trong kế hoạch chế biến theo ngày, bữa và ca."
         actionLabel="Tạo thực đơn"
         actionIcon={Plus}
         onAction={() => openModal('create')}
@@ -151,13 +173,14 @@ function KitchenMenuPage() {
                 ? 'Sửa thực đơn'
                 : 'Chi tiết thực đơn'
           }
-          description="Thực đơn là nguồn dữ liệu để lập kế hoạch chế biến theo ngày, bữa và ca."
+          description="Chỉ các món đã được lập trong kế hoạch cùng ngày, bữa và ca mới xuất hiện để chọn vào thực đơn."
           onClose={closeModal}
         >
           <MenuForm
             mode={activeModal.mode}
             menu={activeModal.menu}
             dishes={dishList}
+            planRows={buildPlanRows(planList, menuList, dishList)}
             mealOptions={mealOptions}
             shiftOptions={kitchenShiftOptions}
             onCancel={closeModal}

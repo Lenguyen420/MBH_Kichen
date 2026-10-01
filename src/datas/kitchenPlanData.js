@@ -201,14 +201,14 @@ export const cookingTracking = [
     id: 'track-001',
     planId: 'plan-001',
     cookingQuantity: 180,
-    actualQuantity: 0,
+    actualQuantity: 176,
     startedAt: '08:18',
     estimatedDoneAt: '09:00',
-    completedAt: '',
+    completedAt: '09:02',
     staff: 'Tổ bếp nóng',
-    status: 'Đang chế biến',
+    status: 'Hoàn thành',
     issueNote: '',
-    note: 'Đang nấu sốt nấm',
+    note: 'Hoàn thành, hụt 4 suất do chia định lượng lại.',
     imageUrl: '',
   },
   {
@@ -223,6 +223,34 @@ export const cookingTracking = [
     status: 'Hoàn thành',
     issueNote: '',
     note: 'Đã chuyển sang nhập món',
+    imageUrl: '',
+  },
+  {
+    id: 'track-003',
+    planId: 'plan-003',
+    cookingQuantity: 160,
+    actualQuantity: 158,
+    startedAt: '08:47',
+    estimatedDoneAt: '09:25',
+    completedAt: '09:22',
+    staff: 'Tổ hấp',
+    status: 'Hoàn thành',
+    issueNote: '',
+    note: 'Đã hấp xong, chuyển chờ nhập kho phục vụ.',
+    imageUrl: '',
+  },
+  {
+    id: 'track-004',
+    planId: 'plan-000',
+    cookingQuantity: 150,
+    actualQuantity: 148,
+    startedAt: '08:02',
+    estimatedDoneAt: '09:00',
+    completedAt: '08:55',
+    staff: 'Tổ bếp nóng',
+    status: 'Hoàn thành',
+    issueNote: '',
+    note: 'Mẻ bún phục vụ quầy số 1 đã hoàn thành.',
     imageUrl: '',
   },
 ]
@@ -248,8 +276,27 @@ export function buildPlanRows(planList, menuList = menus, dishList = dishes) {
     serviceArea: plan.serviceArea || 'Căn tin',
     note: plan.note || '',
     confirmed: Boolean(plan.confirmed || plan.status === 'Đã xác nhận'),
-    dish: getDishById(plan.dishId, dishList),
-    menu: getMenuById(plan.menuId, menuList),
+    dish: getDishById(plan.dishId, dishList) || {
+      id: plan.dishId,
+      name: plan.dishName || 'Món chưa đặt tên',
+      group: 'Món kế hoạch',
+      unit: 'suất',
+      price: 0,
+      standardPortion: plan.ingredients || '',
+      ingredients: plan.ingredients || '',
+      cookDuration: 30,
+      recommendedUseMinutes: 120,
+      requiresSample: true,
+    },
+    menu: getMenuById(plan.menuId, menuList) || {
+      id: plan.menuId || `planned-${plan.date}-${plan.meal}-${plan.shift}`,
+      date: plan.date,
+      meal: plan.meal,
+      shift: plan.shift,
+      title: `Kế hoạch ${plan.meal?.toLowerCase() || ''} ${plan.date || ''}`,
+      dishIds: [plan.dishId].filter(Boolean),
+      locked: false,
+    },
   }))
 }
 
@@ -301,7 +348,16 @@ function readStorageList(key, fallback) {
   }
 
   try {
-    return JSON.parse(storedValue)
+    const storedList = JSON.parse(storedValue)
+
+    if (!Array.isArray(storedList) || !Array.isArray(fallback)) {
+      return storedList
+    }
+
+    const storedIds = new Set(storedList.map((item) => item.id))
+    const missingFallbackItems = fallback.filter((item) => !storedIds.has(item.id))
+
+    return [...storedList, ...missingFallbackItems]
   } catch {
     localStorage.removeItem(key)
     return fallback

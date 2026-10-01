@@ -1,84 +1,123 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
+import { Plus, Trash2 } from 'lucide-react'
 import {
-  getMenuDishes,
+  kitchenShiftOptions,
+  mealOptions,
   planStatusOptions,
   serviceAreaOptions,
   staffGroupOptions,
 } from '../../datas/kitchenPlanData'
 
-function PlanForm({ mode = 'create', plan, menus, dishList, onCancel, onSubmit }) {
-  const firstMenu = menus[0]
-  const initialMenu =
-    menus.find((menu) => menu.id === plan?.menuId) || firstMenu || {}
+const inputClass =
+  'h-11 w-full rounded-xl border border-blue-100 bg-blue-50/50 px-3 text-sm font-semibold outline-none focus:border-blue-400'
+const textareaClass =
+  'min-h-20 w-full rounded-xl border border-blue-100 bg-blue-50/50 px-3 py-3 text-sm font-semibold outline-none focus:border-blue-400'
+
+function createEmptyItem() {
+  return {
+    dishId: '',
+    dishName: '',
+    ingredients: '',
+    expectedQuantity: '',
+    plannedStartAt: '',
+    deadline: '',
+    assignedTo: staffGroupOptions[0],
+    serviceArea: serviceAreaOptions[0],
+    status: 'Chờ xác nhận',
+    note: '',
+  }
+}
+
+function PlanForm({ mode = 'create', plan, onCancel, onSubmit }) {
   const isViewMode = mode === 'view'
-  const menuDates = [...new Set(menus.map((menu) => menu.date))]
-  const menuMeals = [...new Set(menus.map((menu) => menu.meal))]
-  const menuShifts = [...new Set(menus.map((menu) => menu.shift))]
+  const initialMenu = plan?.menu || {}
   const [errorMessage, setErrorMessage] = useState('')
   const [formValue, setFormValue] = useState({
-    menuDate: initialMenu.date || '',
-    menuMeal: initialMenu.meal || '',
-    menuShift: initialMenu.shift || '',
-    dishId: plan?.dishId || '',
-    expectedQuantity: plan?.expectedQuantity || '',
-    plannedStartAt: plan?.plannedStartAt || plan?.startedAt || '',
-    deadline: plan?.deadline || '',
-    assignedTo: plan?.assignedTo || staffGroupOptions[0],
-    serviceArea: plan?.serviceArea || serviceAreaOptions[0],
-    note: plan?.note || '',
-    status: plan?.status || 'Chờ xác nhận',
+    date: initialMenu.date || plan?.date || '2026-09-30',
+    meal: initialMenu.meal || plan?.meal || mealOptions[0],
+    shift: initialMenu.shift || plan?.shift || kitchenShiftOptions[0],
+    items: plan
+      ? [
+          {
+            id: plan.id,
+            dishId: plan.dishId || '',
+            dishName: plan.dish?.name || plan.dishName || '',
+            ingredients:
+              plan.dish?.ingredients ||
+              plan.ingredients ||
+              plan.dish?.standardPortion ||
+              '',
+            expectedQuantity: plan.expectedQuantity || '',
+            plannedStartAt: plan.plannedStartAt || plan.startedAt || '',
+            deadline: plan.deadline || '',
+            assignedTo: plan.assignedTo || staffGroupOptions[0],
+            serviceArea: plan.serviceArea || serviceAreaOptions[0],
+            status: plan.status || 'Chờ xác nhận',
+            note: plan.note || '',
+          },
+        ]
+      : [createEmptyItem()],
   })
 
-  const selectedMenu = useMemo(() => {
-    return menus.find(
-      (menu) =>
-        menu.date === formValue.menuDate &&
-        menu.meal === formValue.menuMeal &&
-        menu.shift === formValue.menuShift,
-    )
-  }, [formValue.menuDate, formValue.menuMeal, formValue.menuShift, menus])
-  const selectedMenuDishes = selectedMenu
-    ? getMenuDishes(selectedMenu, dishList)
-    : []
-
-  function handleChange(event) {
+  function handleHeaderChange(event) {
     const { name, value } = event.target
 
-    setFormValue((currentValue) => {
-      if (['menuDate', 'menuMeal', 'menuShift'].includes(name)) {
-        return {
-          ...currentValue,
-          [name]: value,
-          dishId: '',
-        }
-      }
-
-      return {
-        ...currentValue,
-        [name]: value,
-      }
-    })
+    setFormValue((currentValue) => ({
+      ...currentValue,
+      [name]: value,
+    }))
     setErrorMessage('')
+  }
+
+  function handleItemChange(index, event) {
+    const { name, value } = event.target
+
+    setFormValue((currentValue) => ({
+      ...currentValue,
+      items: currentValue.items.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, [name]: value } : item,
+      ),
+    }))
+    setErrorMessage('')
+  }
+
+  function addItem() {
+    setFormValue((currentValue) => ({
+      ...currentValue,
+      items: [...currentValue.items, createEmptyItem()],
+    }))
+  }
+
+  function removeItem(index) {
+    setFormValue((currentValue) => ({
+      ...currentValue,
+      items: currentValue.items.filter((_, itemIndex) => itemIndex !== index),
+    }))
   }
 
   function handleSubmit(event) {
     event.preventDefault()
 
-    if (!selectedMenu) {
-      setErrorMessage('Không tìm thấy thực đơn phù hợp với ngày, bữa và ca đã chọn.')
+    if (!formValue.items.length) {
+      setErrorMessage('Vui lòng thêm ít nhất một món vào kế hoạch.')
       return
     }
 
-    if (!formValue.dishId) {
-      setErrorMessage('Vui lòng chọn món từ thực đơn.')
+    const missingDish = formValue.items.some((item) => !item.dishName.trim())
+
+    if (missingDish) {
+      setErrorMessage('Vui lòng nhập tên món cho tất cả dòng kế hoạch.')
       return
     }
 
     onSubmit({
-      ...formValue,
-      id: plan?.id,
-      menuId: selectedMenu.id,
-      expectedQuantity: Number(formValue.expectedQuantity),
+      date: formValue.date,
+      meal: formValue.meal,
+      shift: formValue.shift,
+      items: formValue.items.map((item) => ({
+        ...item,
+        expectedQuantity: Number(item.expectedQuantity),
+      })),
     })
   }
 
@@ -87,34 +126,13 @@ function PlanForm({ mode = 'create', plan, menus, dishList, onCancel, onSubmit }
       <div className="grid gap-4 md:grid-cols-3">
         <label className="space-y-2">
           <span className="text-sm font-bold text-slate-700">Ngày</span>
-          <input
-            className="h-11 w-full rounded-xl border border-blue-100 bg-blue-50/50 px-3 text-sm font-semibold outline-none focus:border-blue-400"
-            name="menuDate"
-            type="date"
-            list="menu-date-options"
-            value={formValue.menuDate}
-            disabled={isViewMode}
-            onChange={handleChange}
-            required
-          />
-          <datalist id="menu-date-options">
-            {menuDates.map((date) => (
-              <option key={date} value={date} />
-            ))}
-          </datalist>
+          <input className={inputClass} name="date" type="date" value={formValue.date} disabled={isViewMode} onChange={handleHeaderChange} required />
         </label>
 
         <label className="space-y-2">
           <span className="text-sm font-bold text-slate-700">Bữa</span>
-          <select
-            className="h-11 w-full rounded-xl border border-blue-100 bg-blue-50/50 px-3 text-sm font-semibold outline-none focus:border-blue-400"
-            name="menuMeal"
-            value={formValue.menuMeal}
-            disabled={isViewMode}
-            onChange={handleChange}
-            required
-          >
-            {menuMeals.map((meal) => (
+          <select className={inputClass} name="meal" value={formValue.meal} disabled={isViewMode} onChange={handleHeaderChange}>
+            {mealOptions.map((meal) => (
               <option key={meal} value={meal}>
                 {meal}
               </option>
@@ -124,146 +142,132 @@ function PlanForm({ mode = 'create', plan, menus, dishList, onCancel, onSubmit }
 
         <label className="space-y-2">
           <span className="text-sm font-bold text-slate-700">Ca</span>
-          <select
-            className="h-11 w-full rounded-xl border border-blue-100 bg-blue-50/50 px-3 text-sm font-semibold outline-none focus:border-blue-400"
-            name="menuShift"
-            value={formValue.menuShift}
-            disabled={isViewMode}
-            onChange={handleChange}
-            required
-          >
-            {menuShifts.map((shift) => (
+          <select className={inputClass} name="shift" value={formValue.shift} disabled={isViewMode} onChange={handleHeaderChange}>
+            {kitchenShiftOptions.map((shift) => (
               <option key={shift} value={shift}>
                 {shift}
               </option>
             ))}
           </select>
         </label>
+      </div>
 
-        <label className="space-y-2 md:col-span-3">
-          <span className="text-sm font-bold text-slate-700">
-            Chọn món từ thực đơn
-          </span>
-          <select
-            className="h-11 w-full rounded-xl border border-blue-100 bg-blue-50/50 px-3 text-sm font-semibold outline-none focus:border-blue-400"
-            name="dishId"
-            value={formValue.dishId}
-            disabled={isViewMode || !selectedMenuDishes.length}
-            onChange={handleChange}
-            required
-          >
-            <option value="">Chọn món cần làm</option>
-            {selectedMenuDishes.map((dish) => (
-              <option key={dish.id} value={dish.id}>
-                {dish.name} - {dish.group}
-              </option>
-            ))}
-          </select>
-        </label>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm font-bold text-slate-700">Món trong kế hoạch</p>
+          {!isViewMode ? (
+            <button
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-blue-100 bg-blue-50 px-3 text-sm font-bold text-blue-700 transition hover:bg-blue-100"
+              type="button"
+              onClick={addItem}
+            >
+              <Plus size={17} aria-hidden="true" />
+              Thêm món
+            </button>
+          ) : null}
+        </div>
 
-        <label className="space-y-2">
-          <span className="text-sm font-bold text-slate-700">Số lượng dự kiến</span>
-          <input
-            className="h-11 w-full rounded-xl border border-blue-100 bg-blue-50/50 px-3 text-sm font-semibold outline-none focus:border-blue-400"
-            min="1"
-            name="expectedQuantity"
-            placeholder="Ví dụ: 180"
-            type="number"
-            value={formValue.expectedQuantity}
-            disabled={isViewMode}
-            onChange={handleChange}
-            required
-          />
-        </label>
+        {formValue.items.map((item, index) => (
+          <div className="rounded-2xl border border-blue-100 bg-white p-4 shadow-sm shadow-blue-950/5" key={item.id || index}>
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <p className="text-sm font-black text-blue-700">
+                Món #{index + 1}
+              </p>
+              {!isViewMode && formValue.items.length > 1 ? (
+                <button
+                  className="grid size-9 place-items-center rounded-lg text-red-700 transition hover:bg-red-50"
+                  type="button"
+                  title="Xóa món"
+                  aria-label="Xóa món"
+                  onClick={() => removeItem(index)}
+                >
+                  <Trash2 size={17} aria-hidden="true" />
+                </button>
+              ) : null}
+            </div>
 
-        <label className="space-y-2">
-          <span className="text-sm font-bold text-slate-700">Dự kiến bắt đầu</span>
-          <input
-            className="h-11 w-full rounded-xl border border-blue-100 bg-blue-50/50 px-3 text-sm font-semibold outline-none focus:border-blue-400"
-            name="plannedStartAt"
-            type="time"
-            value={formValue.plannedStartAt}
-            disabled={isViewMode}
-            onChange={handleChange}
-            required
-          />
-        </label>
+            <div className="grid gap-4 md:grid-cols-3">
+              <label className="space-y-2 md:col-span-3">
+                <span className="text-sm font-bold text-slate-700">Tên món</span>
+                <input
+                  className={inputClass}
+                  name="dishName"
+                  placeholder="Ví dụ: Cơm gà sốt nấm"
+                  value={item.dishName}
+                  disabled={isViewMode}
+                  onChange={(event) => handleItemChange(index, event)}
+                  required
+                />
+              </label>
 
-        <label className="space-y-2">
-          <span className="text-sm font-bold text-slate-700">Cần hoàn thành</span>
-          <input
-            className="h-11 w-full rounded-xl border border-blue-100 bg-blue-50/50 px-3 text-sm font-semibold outline-none focus:border-blue-400"
-            name="deadline"
-            type="time"
-            value={formValue.deadline}
-            disabled={isViewMode}
-            onChange={handleChange}
-            required
-          />
-        </label>
+              <label className="space-y-2 md:col-span-3">
+                <span className="text-sm font-bold text-slate-700">Thành phần</span>
+                <textarea
+                  className={textareaClass}
+                  name="ingredients"
+                  placeholder="Ví dụ: cơm trắng, gà, nấm, sốt nâu, rau ăn kèm"
+                  value={item.ingredients}
+                  disabled={isViewMode}
+                  onChange={(event) => handleItemChange(index, event)}
+                  required
+                />
+              </label>
 
-        <label className="space-y-2">
-          <span className="text-sm font-bold text-slate-700">Người/nhóm phụ trách</span>
-          <select
-            className="h-11 w-full rounded-xl border border-blue-100 bg-blue-50/50 px-3 text-sm font-semibold outline-none focus:border-blue-400"
-            name="assignedTo"
-            value={formValue.assignedTo}
-            disabled={isViewMode}
-            onChange={handleChange}
-          >
-            {staffGroupOptions.map((staffGroup) => (
-              <option key={staffGroup} value={staffGroup}>
-                {staffGroup}
-              </option>
-            ))}
-          </select>
-        </label>
+              <label className="space-y-2">
+                <span className="text-sm font-bold text-slate-700">Số lượng dự kiến</span>
+                <input className={inputClass} min="1" name="expectedQuantity" placeholder="Ví dụ: 180" type="number" value={item.expectedQuantity} disabled={isViewMode} onChange={(event) => handleItemChange(index, event)} required />
+              </label>
 
-        <label className="space-y-2">
-          <span className="text-sm font-bold text-slate-700">Khu vực phục vụ</span>
-          <select
-            className="h-11 w-full rounded-xl border border-blue-100 bg-blue-50/50 px-3 text-sm font-semibold outline-none focus:border-blue-400"
-            name="serviceArea"
-            value={formValue.serviceArea}
-            disabled={isViewMode}
-            onChange={handleChange}
-          >
-            {serviceAreaOptions.map((area) => (
-              <option key={area} value={area}>
-                {area}
-              </option>
-            ))}
-          </select>
-        </label>
+              <label className="space-y-2">
+                <span className="text-sm font-bold text-slate-700">Dự kiến bắt đầu</span>
+                <input className={inputClass} name="plannedStartAt" type="time" value={item.plannedStartAt} disabled={isViewMode} onChange={(event) => handleItemChange(index, event)} required />
+              </label>
 
-        <label className="space-y-2">
-          <span className="text-sm font-bold text-slate-700">Trạng thái</span>
-          <select
-            className="h-11 w-full rounded-xl border border-blue-100 bg-blue-50/50 px-3 text-sm font-semibold outline-none focus:border-blue-400"
-            name="status"
-            value={formValue.status}
-            disabled={isViewMode}
-            onChange={handleChange}
-          >
-            {planStatusOptions.map((status) => (
-              <option key={status} value={status}>
-                {status}
-              </option>
-            ))}
-          </select>
-        </label>
+              <label className="space-y-2">
+                <span className="text-sm font-bold text-slate-700">Cần hoàn thành</span>
+                <input className={inputClass} name="deadline" type="time" value={item.deadline} disabled={isViewMode} onChange={(event) => handleItemChange(index, event)} required />
+              </label>
 
-        <label className="space-y-2 md:col-span-3">
-          <span className="text-sm font-bold text-slate-700">Ghi chú</span>
-          <textarea
-            className="min-h-24 w-full rounded-xl border border-blue-100 bg-blue-50/50 px-3 py-3 text-sm font-semibold outline-none focus:border-blue-400"
-            name="note"
-            placeholder="Ví dụ: Phục vụ khối 3 trước 10 phút"
-            value={formValue.note}
-            disabled={isViewMode}
-            onChange={handleChange}
-          />
-        </label>
+              <label className="space-y-2">
+                <span className="text-sm font-bold text-slate-700">Người/nhóm phụ trách</span>
+                <select className={inputClass} name="assignedTo" value={item.assignedTo} disabled={isViewMode} onChange={(event) => handleItemChange(index, event)}>
+                  {staffGroupOptions.map((staffGroup) => (
+                    <option key={staffGroup} value={staffGroup}>
+                      {staffGroup}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="space-y-2">
+                <span className="text-sm font-bold text-slate-700">Khu vực phục vụ</span>
+                <select className={inputClass} name="serviceArea" value={item.serviceArea} disabled={isViewMode} onChange={(event) => handleItemChange(index, event)}>
+                  {serviceAreaOptions.map((area) => (
+                    <option key={area} value={area}>
+                      {area}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="space-y-2">
+                <span className="text-sm font-bold text-slate-700">Trạng thái</span>
+                <select className={inputClass} name="status" value={item.status} disabled={isViewMode} onChange={(event) => handleItemChange(index, event)}>
+                  {planStatusOptions.map((status) => (
+                    <option key={status} value={status}>
+                      {status}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="space-y-2 md:col-span-3">
+                <span className="text-sm font-bold text-slate-700">Ghi chú</span>
+                <textarea className={textareaClass} name="note" placeholder="Ví dụ: Phục vụ khối 3 trước 10 phút" value={item.note} disabled={isViewMode} onChange={(event) => handleItemChange(index, event)} />
+              </label>
+            </div>
+          </div>
+        ))}
       </div>
 
       {errorMessage ? (
@@ -273,18 +277,11 @@ function PlanForm({ mode = 'create', plan, menus, dishList, onCancel, onSubmit }
       ) : null}
 
       <div className="flex justify-end gap-3 border-t border-blue-100 pt-5">
-        <button
-          className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
-          type="button"
-          onClick={onCancel}
-        >
+        <button className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50" type="button" onClick={onCancel}>
           {isViewMode ? 'Đóng' : 'Hủy'}
         </button>
         {!isViewMode ? (
-          <button
-            className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-blue-700"
-            type="submit"
-          >
+          <button className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-blue-700" type="submit">
             Lưu kế hoạch
           </button>
         ) : null}
