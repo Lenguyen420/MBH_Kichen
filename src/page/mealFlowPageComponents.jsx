@@ -7,8 +7,17 @@ const statusTones = {
   'Đã xuất': 'bg-blue-50 text-blue-700 ring-blue-100',
   'Thu hồi': 'bg-slate-100 text-slate-700 ring-slate-200',
   'Hủy': 'bg-red-50 text-red-700 ring-red-100',
+  'Lưu mẫu': 'bg-cyan-50 text-cyan-700 ring-cyan-100',
+  'Phiếu nhập': 'bg-emerald-50 text-emerald-700 ring-emerald-100',
+  'Phiếu xuất': 'bg-blue-50 text-blue-700 ring-blue-100',
+  'Hủy món': 'bg-red-50 text-red-700 ring-red-100',
+  'Tồn món': 'bg-sky-50 text-sky-700 ring-sky-100',
   'Nhập món': 'bg-emerald-50 text-emerald-700 ring-emerald-100',
   'Xuất món': 'bg-blue-50 text-blue-700 ring-blue-100',
+  'Đang lưu': 'bg-cyan-50 text-cyan-700 ring-cyan-100',
+  'Sắp đến hạn': 'bg-amber-50 text-amber-700 ring-amber-100',
+  'Đến hạn': 'bg-orange-50 text-orange-700 ring-orange-100',
+  'Đã xử lý': 'bg-emerald-50 text-emerald-700 ring-emerald-100',
   'Còn sử dụng': 'bg-emerald-50 text-emerald-700 ring-emerald-100',
   'Sắp hết hạn': 'bg-amber-50 text-amber-700 ring-amber-100',
   'Quá hạn': 'bg-red-50 text-red-700 ring-red-100',
@@ -18,28 +27,20 @@ const statusTones = {
 
 const summaryCardTones = [
   {
-    border: 'border-emerald-100',
-    accent: 'bg-emerald-500',
-    icon: 'bg-emerald-50 text-emerald-700 ring-emerald-100',
-    value: 'text-emerald-700',
+    card: 'bg-blue-50 border-blue-100',
+    icon: 'bg-blue-600 shadow-blue-600/25',
   },
   {
-    border: 'border-sky-100',
-    accent: 'bg-sky-500',
-    icon: 'bg-sky-50 text-sky-700 ring-sky-100',
-    value: 'text-sky-700',
+    card: 'bg-emerald-50 border-emerald-100',
+    icon: 'bg-emerald-600 shadow-emerald-500/25',
   },
   {
-    border: 'border-amber-100',
-    accent: 'bg-amber-500',
-    icon: 'bg-amber-50 text-amber-700 ring-amber-100',
-    value: 'text-amber-700',
+    card: 'bg-amber-50 border-amber-100',
+    icon: 'bg-amber-500 shadow-amber-500/25',
   },
   {
-    border: 'border-rose-100',
-    accent: 'bg-rose-500',
-    icon: 'bg-rose-50 text-rose-700 ring-rose-100',
-    value: 'text-rose-700',
+    card: 'bg-violet-50 border-violet-100',
+    icon: 'bg-violet-600 shadow-violet-500/25',
   },
 ]
 
@@ -53,28 +54,27 @@ export function StatusBadge({ status }) {
 
 export function SummaryCards({ cards }) {
   return (
-    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       {cards.map((card, index) => {
         const Icon = card.icon
         const tone = summaryCardTones[index % summaryCardTones.length]
 
         return (
           <article
-            className={`relative overflow-hidden rounded-2xl border ${tone.border} bg-white p-4 shadow-sm shadow-blue-950/5 transition hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-950/10`}
+            className={`rounded-xl border p-5 shadow-sm shadow-blue-950/5 transition hover:-translate-y-0.5 hover:shadow-xl hover:shadow-blue-900/10 ${tone.card}`}
             key={card.label}
           >
-            <div className={`absolute inset-x-0 top-0 h-1 ${tone.accent}`} />
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm font-semibold text-slate-500">
+                <p className="text-sm font-bold text-slate-500">
                   {card.label}
                 </p>
-                <p className={`mt-2 text-3xl font-black tracking-normal ${tone.value}`}>
+                <p className="mt-3 text-3xl font-black tracking-normal text-slate-950">
                   {card.value}
                 </p>
               </div>
-              <div className={`grid size-11 shrink-0 place-items-center rounded-xl ring-1 ${tone.icon}`}>
-                <Icon size={21} aria-hidden="true" />
+              <div className={`grid size-12 shrink-0 place-items-center rounded-lg text-white shadow-lg ${tone.icon}`}>
+                <Icon size={23} aria-hidden="true" />
               </div>
             </div>
           </article>

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
@@ -16,7 +17,6 @@ import MealExportTable from '../components/MealExportPage/MealExportTable'
 import MealHistoryTable from '../components/MealHistoryPage/MealHistoryTable'
 import MealImportForm from '../components/MealImportPage/MealImportForm'
 import MealImportTable from '../components/MealImportPage/MealImportTable'
-import MealCancelForm from '../components/MealInventoryPage/MealCancelForm'
 import MealInventoryEditForm from '../components/MealInventoryPage/MealInventoryEditForm'
 import MealInventoryTable from '../components/MealInventoryPage/MealInventoryTable'
 import FormModal from '../components/KitchenPlan/FormModal'
@@ -34,14 +34,19 @@ import {
   saveStoredMealImports,
   transactionTypeOptions,
 } from '../datas/mealFlowData'
+import { isRowShiftLocked } from '../datas/shiftCloseData'
 import {
   FlowFilters,
   SummaryCards,
 } from './mealFlowPageComponents'
 import {
+  getCurrentDate,
   getCurrentDateTime,
   getMealFlowState,
 } from './mealFlowUtils'
+import {
+  createExportPayload,
+} from './mealFlowPayloads'
 
 function getImportCandidates(completedRows, mealImports) {
   return completedRows
@@ -58,46 +63,9 @@ function getImportCandidates(completedRows, mealImports) {
     .filter((row) => row.availableQuantity > 0)
 }
 
-function createExportPayload(formValue, count) {
-  const sourceRow = formValue.sourceRow
-
-  return {
-    id: createMealFlowId('EXP', formValue.exportedAt, count),
-    importId: sourceRow.id,
-    dishId: sourceRow.dishId,
-    batchCode: sourceRow.batchCode,
-    quantity: formValue.quantity,
-    receiverPlace: formValue.receiverPlace,
-    deliveredBy: formValue.deliveredBy,
-    receivedBy: formValue.receivedBy,
-    exportedAt: formValue.exportedAt,
-    note: formValue.note,
-    status: 'Đã xuất',
-  }
-}
-
-function createCancelPayload(formValue, count) {
-  const sourceRow = formValue.sourceRow
-  const canceledAt = formValue.canceledAt
-
-  return {
-    id: createMealFlowId('CAN', canceledAt, count),
-    importId: sourceRow.id,
-    dishId: sourceRow.dishId,
-    batchCode: sourceRow.batchCode,
-    quantity: Math.max(sourceRow.remainingQuantity, 0),
-    receiverPlace: 'Hủy món',
-    deliveredBy: formValue.canceledBy,
-    receivedBy: '',
-    exportedAt: canceledAt,
-    note: formValue.reason,
-    status: 'Hủy',
-  }
-}
-
 export function MealImportPage() {
   const [mealImports, setMealImports] = useState(readStoredMealImports)
-  const [dateFilter, setDateFilter] = useState('2026-09-30')
+  const [dateFilter, setDateFilter] = useState(getCurrentDate)
   const [ticketCodeFilter, setTicketCodeFilter] = useState('')
   const [dishFilter, setDishFilter] = useState('Tất cả')
   const [statusFilter, setStatusFilter] = useState('Tất cả')
@@ -113,10 +81,19 @@ export function MealImportPage() {
 
     return matchTicketCode && matchDate && matchDish && matchStatus
   })
-  const candidates = getImportCandidates(state.completedRows, mealImports)
+  const candidates = getImportCandidates(
+    state.completedRows.filter((row) => row.menu?.date === dateFilter),
+    mealImports,
+  )
 
   function saveImport(formValue) {
     const sourceRow = formValue.sourceRow
+
+    if (isRowShiftLocked(sourceRow)) {
+      window.alert('Ca đã được quản lý duyệt và khóa. Không thể nhập món.')
+      return
+    }
+
     const nextImport = {
       id:
         formValue.id ||
@@ -144,6 +121,11 @@ export function MealImportPage() {
   }
 
   function confirmImport(row) {
+    if (isRowShiftLocked(row)) {
+      window.alert('Ca đã được quản lý duyệt và khóa. Không thể xác nhận nhập món.')
+      return
+    }
+
     const nextList = mealImports.map((item) =>
       item.id === row.id ? { ...item, status: 'Đã xác nhận' } : item,
     )
@@ -178,7 +160,7 @@ export function MealImportPage() {
 
 export function MealExportPage() {
   const [mealExports, setMealExports] = useState(readStoredMealExports)
-  const [dateFilter, setDateFilter] = useState('2026-09-30')
+  const [dateFilter, setDateFilter] = useState(getCurrentDate)
   const [ticketCodeFilter, setTicketCodeFilter] = useState('')
   const [dishFilter, setDishFilter] = useState('Tất cả')
   const [statusFilter, setStatusFilter] = useState('Tất cả')
@@ -200,6 +182,11 @@ export function MealExportPage() {
   })
 
   function saveExport(formValue) {
+    if (isRowShiftLocked(formValue.sourceRow)) {
+      window.alert('Ca đã được quản lý duyệt và khóa. Không thể xuất món.')
+      return
+    }
+
     const nextList = [createExportPayload(formValue, mealExports.length), ...mealExports]
 
     setMealExports(nextList)
@@ -208,6 +195,11 @@ export function MealExportPage() {
   }
 
   function recallExport(row) {
+    if (isRowShiftLocked(row.sourceImport)) {
+      window.alert('Ca đã được quản lý duyệt và khóa. Không thể thu hồi món.')
+      return
+    }
+
     const nextExport = {
       ...row,
       id: createMealFlowId('EXP', getCurrentDateTime(), mealExports.length),
@@ -243,6 +235,8 @@ export function MealExportPage() {
 }
 
 export function MealInventoryPage() {
+  const navigate = useNavigate()
+  const [dateFilter, setDateFilter] = useState(getCurrentDate)
   const [statusFilter, setStatusFilter] = useState('Tất cả')
   const [dishFilter, setDishFilter] = useState('Tất cả')
   const [activeModal, setActiveModal] = useState(null)
@@ -250,13 +244,19 @@ export function MealInventoryPage() {
   const [mealExports, setMealExports] = useState(readStoredMealExports)
   const state = getMealFlowState()
   const rows = state.inventoryRows.filter((row) => {
+    const matchDate = row.importedAt.startsWith(dateFilter)
     const matchDish = dishFilter === 'Tất cả' || row.dishId === dishFilter
     const matchStatus = statusFilter === 'Tất cả' || row.status === statusFilter
 
-    return matchDish && matchStatus
+    return matchDate && matchDish && matchStatus
   })
 
   function saveExport(formValue) {
+    if (isRowShiftLocked(formValue.sourceRow)) {
+      window.alert('Ca đã được quản lý duyệt và khóa. Không thể xuất món.')
+      return
+    }
+
     const nextList = [createExportPayload(formValue, mealExports.length), ...mealExports]
 
     setMealExports(nextList)
@@ -264,15 +264,14 @@ export function MealInventoryPage() {
     setActiveModal(null)
   }
 
-  function saveCancel(formValue) {
-    const nextList = [createCancelPayload(formValue, mealExports.length), ...mealExports]
-
-    setMealExports(nextList)
-    saveStoredMealExports(nextList)
-    setActiveModal(null)
-  }
-
   function saveInventoryEdit(formValue) {
+    const sourceRow = state.inventoryRows.find((row) => row.id === formValue.id)
+
+    if (isRowShiftLocked(sourceRow)) {
+      window.alert('Ca đã được quản lý duyệt và khóa. Không thể sửa tồn món.')
+      return
+    }
+
     const nextList = mealImports.map((item) =>
       item.id === formValue.id
         ? {
@@ -295,39 +294,33 @@ export function MealInventoryPage() {
     <section className="space-y-6">
       <KitchenPlanHeader title="Món còn lại" description="Theo dõi số lượng món đã nhập, đã xuất và còn lại theo thời gian sử dụng." actionLabel="Xuất thêm" actionIcon={Send} onAction={() => setActiveModal({ mode: 'export' })} />
       <SummaryCards cards={[
-        { label: 'Mẻ còn tồn', value: state.inventoryRows.filter((row) => row.remainingQuantity > 0).length, icon: PackageCheck },
-        { label: 'Sắp hết hạn', value: state.inventoryRows.filter((row) => row.status === 'Sắp hết hạn').length, icon: History },
-        { label: 'Quá hạn', value: state.inventoryRows.filter((row) => row.status === 'Quá hạn').length, icon: Trash2 },
-        { label: 'Tổng còn', value: state.inventoryRows.reduce((total, row) => total + Math.max(row.remainingQuantity, 0), 0), icon: ArrowDownToLine },
+        { label: 'Mẻ còn tồn', value: rows.filter((row) => row.remainingQuantity > 0).length, icon: PackageCheck },
+        { label: 'Sắp hết hạn', value: rows.filter((row) => row.status === 'Sắp hết hạn').length, icon: History },
+        { label: 'Quá hạn', value: rows.filter((row) => row.status === 'Quá hạn').length, icon: Trash2 },
+        { label: 'Tổng còn', value: rows.reduce((total, row) => total + Math.max(row.remainingQuantity, 0), 0), icon: ArrowDownToLine },
       ]} />
-      <FlowFilters dish={dishFilter} status={statusFilter} dishes={state.dishList} statusOptions={inventoryStatusOptions} onDishChange={setDishFilter} onStatusChange={setStatusFilter} />
+      <FlowFilters date={dateFilter} dish={dishFilter} status={statusFilter} dishes={state.dishList} statusOptions={inventoryStatusOptions} onDateChange={setDateFilter} onDishChange={setDishFilter} onStatusChange={setStatusFilter} />
       <MealInventoryTable
         rows={rows}
-        onCancel={(row) => setActiveModal({ mode: 'cancel', row })}
+        onCancel={(row) => navigate(`/dashboard/inventory/cancel?importId=${row.id}`)}
         onEdit={(row) => setActiveModal({ mode: 'edit', row })}
         onExport={(row) => setActiveModal({ mode: 'export', row })}
       />
       {activeModal ? (
         <FormModal
           title={
-            activeModal.mode === 'cancel'
-              ? 'Hủy món còn lại'
-              : activeModal.mode === 'edit'
+            activeModal.mode === 'edit'
                 ? 'Sửa thông tin tồn món'
                 : 'Xuất thêm từ tồn món'
           }
           description={
-            activeModal.mode === 'cancel'
-              ? 'Nhập ngày giờ, nhân viên và lý do hủy để lưu vào lịch sử và trừ tồn món.'
-              : activeModal.mode === 'edit'
+            activeModal.mode === 'edit'
                 ? 'Cập nhật thông tin phiếu nhập nguồn của mẻ còn lại.'
                 : 'Chọn mẻ còn trong thời gian sử dụng để xuất bổ sung.'
           }
           onClose={() => setActiveModal(null)}
         >
-          {activeModal.mode === 'cancel' ? (
-            <MealCancelForm row={activeModal.row} onCancel={() => setActiveModal(null)} onSubmit={saveCancel} />
-          ) : activeModal.mode === 'edit' ? (
+          {activeModal.mode === 'edit' ? (
             <MealInventoryEditForm row={activeModal.row} onCancel={() => setActiveModal(null)} onSubmit={saveInventoryEdit} />
           ) : (
             <MealExportForm inventoryRows={activeModal.row ? [activeModal.row] : state.inventoryRows.filter((row) => row.remainingQuantity > 0 && row.status !== 'Quá hạn')} onCancel={() => setActiveModal(null)} onSubmit={saveExport} />
@@ -340,7 +333,7 @@ export function MealInventoryPage() {
 
 export function MealHistoryPage() {
   const state = useMemo(() => getMealFlowState(), [])
-  const [dateFilter, setDateFilter] = useState('2026-09-30')
+  const [dateFilter, setDateFilter] = useState(getCurrentDate)
   const [dishFilter, setDishFilter] = useState('Tất cả')
   const [typeFilter, setTypeFilter] = useState('Tất cả')
   const [shiftFilter, setShiftFilter] = useState('Tất cả')

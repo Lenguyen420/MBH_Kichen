@@ -1,8 +1,7 @@
 import {
   CalendarDays,
-  ClipboardCheck,
   ClipboardList,
-  FileBarChart,
+  FileText,
   FlaskConical,
   Home,
   Utensils,
@@ -38,23 +37,14 @@ export const navigationItems = [
     icon: FlaskConical,
     children: [
       { label: 'Quản lý lưu mẫu', path: '/dashboard/samples/manage' },
-      { label: 'Mẫu đến hạn', path: '/dashboard/samples/due' },
       { label: 'Hủy món', path: '/dashboard/inventory/cancel' },
       { label: 'Lịch sử', path: '/dashboard/samples/history' },
     ],
   },
   {
-    label: 'Chốt ca',
-    path: '/dashboard/shift/summary',
-    icon: ClipboardCheck,
-  },
-  {
-    label: 'Báo cáo & Cấu hình',
-    icon: FileBarChart,
-    children: [
-      { label: 'Báo cáo', path: '/dashboard/reports' },
-      { label: 'Cấu hình', path: '/dashboard/settings' },
-    ],
+    label: 'Báo cáo',
+    path: '/dashboard/reports',
+    icon: FileText,
   },
 ]
 

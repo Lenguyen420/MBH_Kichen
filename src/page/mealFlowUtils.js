@@ -4,8 +4,10 @@ import {
   buildInventoryRows,
   buildMealExportRows,
   buildMealImportRows,
+  buildSampleRows,
   readStoredMealExports,
   readStoredMealImports,
+  readStoredMealSamples,
 } from '../datas/mealFlowData'
 
 export const inputClass =
@@ -45,14 +47,20 @@ export function getCurrentDateTime() {
   return new Date(now.getTime() - timezoneOffset).toISOString().slice(0, 16)
 }
 
+export function getCurrentDate() {
+  return getCurrentDateTime().slice(0, 10)
+}
+
 export function getMealFlowState() {
   const dishList = readStoredKitchenDishes()
   const completedRows = buildCompletedCookingRows()
   const importList = readStoredMealImports()
   const exportList = readStoredMealExports()
+  const sampleList = readStoredMealSamples()
   const importRows = buildMealImportRows(importList, completedRows, dishList)
   const exportRows = buildMealExportRows(exportList, importRows, dishList)
   const inventoryRows = buildInventoryRows(importRows, exportList)
+  const sampleRows = buildSampleRows(sampleList, importRows, completedRows, dishList)
 
   return {
     completedRows,
@@ -62,5 +70,7 @@ export function getMealFlowState() {
     importList,
     importRows,
     inventoryRows,
+    sampleList,
+    sampleRows,
   }
 }

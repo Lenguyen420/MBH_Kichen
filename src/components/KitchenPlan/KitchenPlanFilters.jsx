@@ -42,22 +42,24 @@ function KitchenPlanFilters({
         />
       </label>
 
-      <label className="flex items-center gap-3 rounded-xl border border-blue-100 bg-blue-50/60 px-3 py-3">
-        <Filter size={18} className="text-blue-700" aria-hidden="true" />
-        <span className="sr-only">Bữa</span>
-        <select
-          className="w-full bg-transparent text-sm font-bold text-slate-800 outline-none"
-          value={meal}
-          onChange={(event) => onMealChange(event.target.value)}
-        >
-          <option value="Tất cả">Tất cả bữa</option>
-          {mealOptions.map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
-        </select>
-      </label>
+      {typeof meal === 'string' ? (
+        <label className="flex items-center gap-3 rounded-xl border border-blue-100 bg-blue-50/60 px-3 py-3">
+          <Filter size={18} className="text-blue-700" aria-hidden="true" />
+          <span className="sr-only">Bữa</span>
+          <select
+            className="w-full bg-transparent text-sm font-bold text-slate-800 outline-none"
+            value={meal}
+            onChange={(event) => onMealChange(event.target.value)}
+          >
+            <option value="Tất cả">Tất cả bữa</option>
+            {mealOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
 
       <label className="flex items-center gap-3 rounded-xl border border-blue-100 bg-blue-50/60 px-3 py-3">
         <UsersRound size={18} className="text-blue-700" aria-hidden="true" />

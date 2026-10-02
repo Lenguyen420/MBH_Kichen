@@ -11,8 +11,13 @@ import {
   MealImportPage,
   MealInventoryPage,
 } from './page/MealFlowPages'
+import MealCancelPage from './page/MealCancelPage'
+import MealSampleHistoryPage from './page/MealSampleHistoryPage'
+import MealSampleManagePage from './page/MealSampleManagePage'
 import NotFoundPage from './page/NotFoundPage'
 import PlaceholderPage from './page/PlaceholderPage'
+import ReportsPage from './page/ReportsPage'
+import ShiftSummaryPage from './page/ShiftSummaryPage'
 
 function App() {
   return (
@@ -28,6 +33,11 @@ function App() {
         <Route path="meal-flow/export" element={<MealExportPage />} />
         <Route path="inventory/remaining" element={<MealInventoryPage />} />
         <Route path="meal-flow/history" element={<MealHistoryPage />} />
+        <Route path="samples/manage" element={<MealSampleManagePage />} />
+        <Route path="inventory/cancel" element={<MealCancelPage />} />
+        <Route path="samples/history" element={<MealSampleHistoryPage />} />
+        <Route path="reports" element={<ReportsPage />} />
+        <Route path="shift/summary" element={<ShiftSummaryPage />} />
         <Route path="*" element={<PlaceholderPage />} />
       </Route>
       <Route path="*" element={<NotFoundPage />} />

@@ -18,6 +18,8 @@ import {
   saveStoredKitchenDishes,
   saveStoredKitchenPlans,
 } from '../datas/kitchenPlanData'
+import { isShiftLocked } from '../datas/shiftCloseData'
+import { getCurrentDate } from './mealFlowUtils'
 
 function createDishId(name, index) {
   const normalizedName = name
@@ -41,7 +43,7 @@ function KitchenPlanTodayPage() {
     (row) => row.id === queryPlanId,
   )
   const [selectedDate, setSelectedDate] = useState(
-    queryRow?.menu?.date || '2026-09-30',
+    queryRow?.menu?.date || getCurrentDate(),
   )
   const [selectedMeal, setSelectedMeal] = useState(
     queryRow?.menu?.meal || 'Tất cả',
@@ -107,6 +109,11 @@ function KitchenPlanTodayPage() {
   }
 
   function savePlan(planValue) {
+    if (isShiftLocked(planValue.date, planValue.shift)) {
+      window.alert('Ca đã được quản lý duyệt và khóa. Không thể sửa kế hoạch.')
+      return
+    }
+
     const planMenuId = `planned-${planValue.date}-${planValue.meal}-${planValue.shift}`
     const nextDishList = [...dishList]
     const nextPlanItems = planValue.items.map((item, index) => {
@@ -127,7 +134,7 @@ function KitchenPlanTodayPage() {
         ingredients,
         cookDuration: existingDish?.cookDuration || 30,
         recommendedUseMinutes: existingDish?.recommendedUseMinutes || 120,
-        requiresSample: existingDish?.requiresSample ?? true,
+        requiresSample: item.requiresSample ?? true,
       }
       const existingDishIndex = nextDishList.findIndex((dish) => dish.id === dishId)
 
@@ -172,6 +179,11 @@ function KitchenPlanTodayPage() {
   }
 
   function confirmPlan(row) {
+    if (isShiftLocked(row.menu?.date, row.menu?.shift)) {
+      window.alert('Ca đã được quản lý duyệt và khóa. Không thể xác nhận kế hoạch.')
+      return
+    }
+
     const nextPlans = planList.map((plan) =>
       plan.id === row.id
         ? { ...plan, confirmed: true, status: 'Đã chuyển bếp' }
@@ -183,6 +195,11 @@ function KitchenPlanTodayPage() {
   }
 
   function copyPreviousDayPlans() {
+    if (selectedShift !== 'Tất cả' && isShiftLocked(selectedDate, selectedShift)) {
+      window.alert('Ca đã được quản lý duyệt và khóa. Không thể sao chép kế hoạch.')
+      return
+    }
+
     const selectedTime = new Date(selectedDate).getTime()
     const previousDate = new Date(selectedTime - 24 * 60 * 60 * 1000)
       .toISOString()

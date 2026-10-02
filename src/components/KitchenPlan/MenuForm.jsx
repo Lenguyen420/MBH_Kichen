@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { getCurrentDate } from '../../page/mealFlowUtils'
 
 function MenuForm({
   mode = 'create',
@@ -13,7 +14,7 @@ function MenuForm({
   const isViewMode = mode === 'view'
   const [errorMessage, setErrorMessage] = useState('')
   const [formValue, setFormValue] = useState({
-    date: menu?.date || '2026-09-30',
+    date: menu?.date || getCurrentDate(),
     meal: menu?.meal || mealOptions[0],
     shift: menu?.shift || shiftOptions[0],
     title: menu?.title || '',

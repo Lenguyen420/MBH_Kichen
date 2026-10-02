@@ -8,6 +8,7 @@ import {
 
 export const MEAL_IMPORTS_KEY = 'kido_canteen_meal_imports'
 export const MEAL_EXPORTS_KEY = 'kido_canteen_meal_exports'
+export const MEAL_SAMPLES_KEY = 'kido_canteen_meal_samples'
 
 export const receiverAreaOptions = [
   'Quầy bán',
@@ -34,6 +35,19 @@ export const inventoryStatusOptions = [
   'Đã hết',
 ]
 export const transactionTypeOptions = ['Nhập món', 'Xuất món', 'Thu hồi', 'Hủy']
+export const sampleStatusOptions = [
+  'Đang lưu',
+  'Sắp đến hạn',
+  'Đến hạn',
+  'Quá hạn',
+  'Đã xử lý',
+]
+export const cancelSourceOptions = [
+  'Món tồn',
+  'Món hỏng trong chế biến',
+  'Món quá thời gian',
+  'Món bị trả lại',
+]
 
 export const mealImports = [
   {
@@ -171,6 +185,45 @@ export const mealExports = [
   },
 ]
 
+export const mealSamples = [
+  {
+    id: 'SAM-20260930-001',
+    importId: 'IMP-20260930-001',
+    cookingId: 'track-001',
+    planId: 'plan-001',
+    dishId: 'dish-001',
+    batchCode: 'ME-20260930-CGN-01',
+    quantity: 1,
+    sampledAt: '2026-09-30T09:12',
+    sampledBy: 'Nguyễn Minh Anh',
+    storageLocation: 'Tủ lưu mẫu A - Ngăn 1',
+    storageStartedAt: '2026-09-30T09:15',
+    expectedEndAt: '2026-10-01T09:15',
+    imageUrl: '',
+    status: 'Đã xử lý',
+    processedAt: '2026-10-01T09:20',
+    processedBy: 'Trần Quốc Bảo',
+  },
+  {
+    id: 'SAM-20260930-002',
+    importId: 'IMP-20260930-002',
+    cookingId: 'track-002',
+    planId: 'plan-002',
+    dishId: 'dish-002',
+    batchCode: 'ME-20260930-CT-01',
+    quantity: 1,
+    sampledAt: '2026-09-30T09:18',
+    sampledBy: 'Lê Thị Hương',
+    storageLocation: 'Tủ lưu mẫu A - Ngăn 2',
+    storageStartedAt: '2026-09-30T09:20',
+    expectedEndAt: '2026-10-01T09:20',
+    imageUrl: '',
+    status: 'Đang lưu',
+    processedAt: '',
+    processedBy: '',
+  },
+]
+
 function readStorageList(key, fallback) {
   const storedValue = localStorage.getItem(key)
 
@@ -209,6 +262,14 @@ export function readStoredMealExports() {
 
 export function saveStoredMealExports(exportList) {
   localStorage.setItem(MEAL_EXPORTS_KEY, JSON.stringify(exportList))
+}
+
+export function readStoredMealSamples() {
+  return readStorageList(MEAL_SAMPLES_KEY, mealSamples)
+}
+
+export function saveStoredMealSamples(sampleList) {
+  localStorage.setItem(MEAL_SAMPLES_KEY, JSON.stringify(sampleList))
 }
 
 export function buildCompletedCookingRows() {
@@ -261,7 +322,7 @@ export function getNetExportedQuantity(exportList, importId) {
 }
 
 export function buildInventoryRows(importRows, exportList) {
-  const now = new Date('2026-10-01T12:00:00')
+  const now = new Date()
 
   return importRows
     .filter((row) => row.status === 'Đã xác nhận')
@@ -273,9 +334,13 @@ export function buildInventoryRows(importRows, exportList) {
       const latestCancel = cancelTransactions[0]
       const remainingQuantity = Number(row.quantity || 0) - exportedQuantity
       const recommendedUseMinutes = row.dish?.recommendedUseMinutes || 120
-      const importedDate = new Date(row.importedAt)
+      const completedDateTime =
+        row.completedRow?.completedAt && row.completedRow?.menu?.date
+          ? `${row.completedRow.menu.date}T${row.completedRow.completedAt}`
+          : row.importedAt
+      const completedDate = new Date(completedDateTime)
       const expiresAt = new Date(
-        importedDate.getTime() + recommendedUseMinutes * 60 * 1000,
+        completedDate.getTime() + recommendedUseMinutes * 60 * 1000,
       )
       const minutesLeft = Math.round((expiresAt.getTime() - now.getTime()) / 60000)
       const status =
@@ -309,6 +374,62 @@ export function buildInventoryRows(importRows, exportList) {
     })
 }
 
+export function getSampleRuntimeStatus(sample, nowValue = new Date()) {
+  if (sample.status === 'Đã xử lý') {
+    return 'Đã xử lý'
+  }
+
+  const now = nowValue instanceof Date ? nowValue : new Date(nowValue)
+  const dueDate = new Date(sample.expectedEndAt)
+  const minutesLeft = Math.round((dueDate.getTime() - now.getTime()) / 60000)
+
+  if (minutesLeft < 0) {
+    return 'Quá hạn'
+  }
+
+  if (minutesLeft <= 30) {
+    return 'Đến hạn'
+  }
+
+  if (minutesLeft <= 180) {
+    return 'Sắp đến hạn'
+  }
+
+  return 'Đang lưu'
+}
+
+export function buildSampleRows(sampleList, importRows, completedRows, dishList) {
+  return sampleList.map((sample) => {
+    const sourceImport = importRows.find((item) => item.id === sample.importId)
+    const completedRow =
+      completedRows.find((item) => item.id === sample.cookingId) ||
+      completedRows.find((item) => item.planId === sample.planId)
+    const dish =
+      dishList.find((item) => item.id === sample.dishId) ||
+      sourceImport?.dish ||
+      completedRow?.dish
+
+    return {
+      ...sample,
+      completedRow,
+      dish,
+      sourceImport,
+      status: getSampleRuntimeStatus(sample),
+    }
+  })
+}
+
+export function getSampleCandidates(importRows, sampleRows) {
+  const sampledImportIds = new Set(sampleRows.map((item) => item.importId))
+
+  return importRows.filter(
+    (row) =>
+      row.status === 'Đã xác nhận' &&
+      row.dish?.requiresSample &&
+      !sampledImportIds.has(row.id),
+  )
+}
+
 export function buildHistoryRows(importRows, exportRows) {
   const importHistory = importRows.map((item) => ({
     id: item.id,
@@ -338,6 +459,10 @@ export function buildHistoryRows(importRows, exportRows) {
     partner: item.receiverPlace,
     happenedAt: item.exportedAt,
     note: item.note,
+    cancelSource: item.cancelSource || '',
+    confirmedBy: item.confirmedBy || '',
+    imageUrl: item.imageUrl || '',
+    imageName: item.imageName || '',
   }))
 
   return [...importHistory, ...exportHistory].sort((left, right) =>

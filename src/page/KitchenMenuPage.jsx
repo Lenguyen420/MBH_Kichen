@@ -16,12 +16,14 @@ import {
   saveStoredKitchenMenus,
   saveStoredKitchenPlans,
 } from '../datas/kitchenPlanData'
+import { isShiftLocked } from '../datas/shiftCloseData'
+import { getCurrentDate } from './mealFlowUtils'
 
 function KitchenMenuPage() {
   const [dishList] = useState(readStoredKitchenDishes)
   const [menuList, setMenuList] = useState(readStoredKitchenMenus)
   const [planList, setPlanList] = useState(readStoredKitchenPlans)
-  const [selectedDate, setSelectedDate] = useState('2026-09-30')
+  const [selectedDate, setSelectedDate] = useState(getCurrentDate)
   const [selectedMeal, setSelectedMeal] = useState('Tất cả')
   const [selectedShift, setSelectedShift] = useState('Tất cả')
   const [searchValue, setSearchValue] = useState('')
@@ -54,6 +56,11 @@ function KitchenMenuPage() {
   }
 
   function saveMenu(menuValue) {
+    if (isShiftLocked(menuValue.date, menuValue.shift)) {
+      window.alert('Ca đã được quản lý duyệt và khóa. Không thể sửa thực đơn.')
+      return
+    }
+
     const nextMenu = {
       id: menuValue.id || `menu-${Date.now()}`,
       date: menuValue.date,
@@ -107,6 +114,11 @@ function KitchenMenuPage() {
   }
 
   function copyMenu(menu) {
+    if (isShiftLocked(menu.date, menu.shift)) {
+      window.alert('Ca đã được quản lý duyệt và khóa. Không thể sao chép thực đơn.')
+      return
+    }
+
     const copiedMenu = {
       ...menu,
       id: `menu-${Date.now()}`,
@@ -124,6 +136,11 @@ function KitchenMenuPage() {
   }
 
   function lockMenu(menu) {
+    if (isShiftLocked(menu.date, menu.shift)) {
+      window.alert('Ca đã được quản lý duyệt và khóa. Không thể đổi trạng thái thực đơn.')
+      return
+    }
+
     const nextMenus = menuList.map((item) =>
       item.id === menu.id ? { ...item, locked: true } : item,
     )

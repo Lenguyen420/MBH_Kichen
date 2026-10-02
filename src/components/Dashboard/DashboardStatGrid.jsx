@@ -54,7 +54,7 @@ const statTones = {
   },
 }
 
-function DashboardStatGrid({ stats }) {
+function DashboardStatGrid({ onOpen, stats }) {
   return (
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
       {stats.map((stat) => {
@@ -62,9 +62,11 @@ function DashboardStatGrid({ stats }) {
         const tone = statTones[stat.tone]
 
         return (
-          <article
-            className={`group relative min-h-40 overflow-hidden rounded-xl border p-6 shadow-sm shadow-blue-950/5 transition hover:-translate-y-0.5 hover:shadow-xl hover:shadow-blue-900/10 ${tone.card}`}
+          <button
+            className={`group relative min-h-40 overflow-hidden rounded-xl border p-6 text-left shadow-sm shadow-blue-950/5 transition hover:-translate-y-0.5 hover:shadow-xl hover:shadow-blue-900/10 focus:outline-none focus:ring-2 focus:ring-blue-400 ${tone.card}`}
             key={stat.key}
+            type="button"
+            onClick={() => onOpen(stat)}
           >
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
@@ -83,7 +85,10 @@ function DashboardStatGrid({ stats }) {
             <span className={`mt-6 inline-flex rounded-full px-3 py-1.5 text-sm font-black ${tone.badge}`}>
               {stat.note}
             </span>
-          </article>
+            <span className="absolute bottom-5 right-5 text-sm font-black text-blue-700 opacity-0 transition group-hover:opacity-100">
+              Xem chi tiết
+            </span>
+          </button>
         )
       })}
     </div>

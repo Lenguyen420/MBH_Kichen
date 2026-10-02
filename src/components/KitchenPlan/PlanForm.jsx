@@ -7,6 +7,7 @@ import {
   serviceAreaOptions,
   staffGroupOptions,
 } from '../../datas/kitchenPlanData'
+import { getCurrentDate } from '../../page/mealFlowUtils'
 
 const inputClass =
   'h-11 w-full rounded-xl border border-blue-100 bg-blue-50/50 px-3 text-sm font-semibold outline-none focus:border-blue-400'
@@ -18,6 +19,7 @@ function createEmptyItem() {
     dishId: '',
     dishName: '',
     ingredients: '',
+    requiresSample: true,
     expectedQuantity: '',
     plannedStartAt: '',
     deadline: '',
@@ -33,7 +35,7 @@ function PlanForm({ mode = 'create', plan, onCancel, onSubmit }) {
   const initialMenu = plan?.menu || {}
   const [errorMessage, setErrorMessage] = useState('')
   const [formValue, setFormValue] = useState({
-    date: initialMenu.date || plan?.date || '2026-09-30',
+    date: initialMenu.date || plan?.date || getCurrentDate(),
     meal: initialMenu.meal || plan?.meal || mealOptions[0],
     shift: initialMenu.shift || plan?.shift || kitchenShiftOptions[0],
     items: plan
@@ -47,6 +49,7 @@ function PlanForm({ mode = 'create', plan, onCancel, onSubmit }) {
               plan.ingredients ||
               plan.dish?.standardPortion ||
               '',
+            requiresSample: plan.dish?.requiresSample ?? true,
             expectedQuantity: plan.expectedQuantity || '',
             plannedStartAt: plan.plannedStartAt || plan.startedAt || '',
             deadline: plan.deadline || '',
@@ -70,12 +73,13 @@ function PlanForm({ mode = 'create', plan, onCancel, onSubmit }) {
   }
 
   function handleItemChange(index, event) {
-    const { name, value } = event.target
+    const { checked, name, type, value } = event.target
+    const nextFieldValue = type === 'checkbox' ? checked : value
 
     setFormValue((currentValue) => ({
       ...currentValue,
       items: currentValue.items.map((item, itemIndex) =>
-        itemIndex === index ? { ...item, [name]: value } : item,
+        itemIndex === index ? { ...item, [name]: nextFieldValue } : item,
       ),
     }))
     setErrorMessage('')
@@ -259,6 +263,18 @@ function PlanForm({ mode = 'create', plan, onCancel, onSubmit }) {
                     </option>
                   ))}
                 </select>
+              </label>
+
+              <label className="flex h-11 items-center gap-3 rounded-xl border border-blue-100 bg-blue-50/50 px-3">
+                <input
+                  className="size-4 rounded border-blue-200 text-blue-600"
+                  name="requiresSample"
+                  type="checkbox"
+                  checked={item.requiresSample}
+                  disabled={isViewMode}
+                  onChange={(event) => handleItemChange(index, event)}
+                />
+                <span className="text-sm font-bold text-slate-700">Cần lưu mẫu</span>
               </label>
 
               <label className="space-y-2 md:col-span-3">

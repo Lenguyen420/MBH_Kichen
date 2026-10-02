@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { ChefHat } from 'lucide-react'
 import TrackingForm from '../components/CookingTracking/TrackingForm'
 import TrackingTable from '../components/CookingTracking/TrackingTable'
@@ -16,21 +17,32 @@ import {
   readStoredKitchenPlans,
   saveStoredCookingTracking,
 } from '../datas/kitchenPlanData'
+import { readStoredMealSamples } from '../datas/mealFlowData'
+import { isRowShiftLocked } from '../datas/shiftCloseData'
+import { getCurrentDate } from './mealFlowUtils'
 
 function getCurrentTime() {
   return new Date().toTimeString().slice(0, 5)
 }
 
+function hasStoredSample(row, sampleList) {
+  return sampleList.some(
+    (sample) => sample.planId === row.planId || sample.cookingId === row.id,
+  )
+}
+
 function CookingTrackingPage() {
+  const navigate = useNavigate()
   const [dishList] = useState(readStoredKitchenDishes)
   const [menuList] = useState(readStoredKitchenMenus)
   const [planList] = useState(readStoredKitchenPlans)
   const [trackingList, setTrackingList] = useState(readStoredCookingTracking)
-  const [selectedDate, setSelectedDate] = useState('2026-09-30')
+  const [selectedDate, setSelectedDate] = useState(getCurrentDate)
   const [selectedMeal, setSelectedMeal] = useState('Tất cả')
   const [selectedShift, setSelectedShift] = useState('Tất cả')
   const [selectedStatus, setSelectedStatus] = useState('Tất cả')
   const [activeModal, setActiveModal] = useState(null)
+  const sampleList = readStoredMealSamples()
 
   const rows = useMemo(() => {
     return buildCookingRows(planList, trackingList, menuList, dishList).filter(
@@ -57,6 +69,11 @@ function CookingTrackingPage() {
   ])
 
   function upsertTracking(row, changes) {
+    if (isRowShiftLocked(row)) {
+      window.alert('Ca đã được quản lý duyệt và khóa. Không thể sửa theo dõi chế biến.')
+      return
+    }
+
     const nextTracking = {
       id: row.id,
       planId: row.planId,
@@ -93,6 +110,15 @@ function CookingTrackingPage() {
   }
 
   function saveTracking(rowValue) {
+    if (
+      activeModal?.mode === 'complete' &&
+      rowValue.dish?.requiresSample &&
+      !hasStoredSample(rowValue, sampleList)
+    ) {
+      navigate(`/dashboard/samples/manage?planId=${rowValue.planId}&cookingId=${rowValue.id}&completeAfterSample=1`)
+      return
+    }
+
     upsertTracking(rowValue, {
       cookingQuantity: rowValue.cookingQuantity,
       actualQuantity: rowValue.actualQuantity,
@@ -108,6 +134,15 @@ function CookingTrackingPage() {
       imageUrl: '',
     })
     setActiveModal(null)
+  }
+
+  function completeCooking(row) {
+    if (row.dish?.requiresSample && !hasStoredSample(row, sampleList)) {
+      navigate(`/dashboard/samples/manage?planId=${row.planId}&cookingId=${row.id}&completeAfterSample=1`)
+      return
+    }
+
+    setActiveModal({ mode: 'complete', row })
   }
 
   return (
@@ -139,7 +174,7 @@ function CookingTrackingPage() {
         onStart={startCooking}
         onUpdate={(row) => setActiveModal({ mode: 'update', row })}
         onIssue={(row) => setActiveModal({ mode: 'issue', row })}
-        onComplete={(row) => setActiveModal({ mode: 'complete', row })}
+        onComplete={completeCooking}
       />
 
       {activeModal ? (
